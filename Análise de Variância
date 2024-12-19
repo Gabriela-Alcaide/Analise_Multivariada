@@ -1,0 +1,164 @@
+if(!require(dplyr)) install.packages("dplyr")
+library(dplyr)
+if(!require(car)) install.packages("car")
+library(car)
+if(!require(ggplot2)) install.packages("ggplot2")
+library(ggplot2)
+if(!require(readxl)) install.packages("readxl")
+library(readxl)
+
+dataset_normalizado$explicito <- as.factor(dataset_normalizado$explicito)
+dataset_normalizado$modo <- as.factor(dataset_normalizado$modo)
+dataset_normalizado$compasso <- as.factor(dataset_normalizado$compasso)
+dataset_normalizado$genero <- as.factor(dataset_normalizado$genero)
+dataset_normalizado$tonalidade <- as.factor(dataset_normalizado$tonalidade)
+
+
+identificar_nao_numericos <- function(var) {
+  nao_numericos <- var[is.na(as.numeric(as.character(var)))]
+  return(unique(nao_numericos))
+}
+
+
+vars_quantitativas <- c("acusticidade_norm", "dancabilidade_norm", "duracao_ms_norm","energia_norm", "instrumentalidade", "vivacidade_norm", "intensidade_sonora_mod", "discursividade_norm","valencia_norm", "popularidade_artista_norm","popularidade_album_norm", "ordem_no_album_norm")
+
+for (var in vars_quantitativas) {
+  print(paste("Valores não numéricos na variável", var, ":"))
+  print(identificar_nao_numericos(dataset_normalizado[[var]]))
+}
+
+
+substituir_nao_numericos <- function(var) {
+  var <- as.numeric(as.character(var))
+  return(var)
+}
+
+
+for (var in vars_quantitativas) {
+  dataset_normalizado[[var]] <- substituir_nao_numericos(dataset_normalizado[[var]])
+}
+
+
+dataset_normalizado <- dataset_normalizado %>% na.omit()
+
+
+discretizar_var <- function(var, nome_var) {
+    q1 <- quantile(var, 1/3, na.rm = TRUE)
+    q2 <- quantile(var, 2/3, na.rm = TRUE)
+    
+    if (is.na(q1) | is.na(q2)) {
+        warning(paste("Não foi possível calcular quantis para a variável", nome_var))
+        return(rep(NA, length(var)))
+    }
+    
+    if (q1 == q2) {
+        q1 <- quantile(var, 0.25, na.rm = TRUE)
+        q2 <- quantile(var, 0.75, na.rm = TRUE)
+        
+        if (q1 == q2) {
+            q2 <- q1 + 1e-6
+        }
+    }
+    
+    if (length(unique(c(-Inf, q1, q2, Inf))) != 4) {
+        q1 <- quantile(var, 0.2, na.rm = TRUE)
+        q2 <- quantile(var, 0.8, na.rm = TRUE)
+        
+        if (is.na(q1) | is.na(q2)) {
+            warning(paste("Não foi possível calcular quantis alternativos para a variável", nome_var))
+            return(rep(NA, length(var))) 
+        }
+    }
+    
+    fator <- cut(var, breaks = c(-Inf, q1, q2, Inf), labels = c("baixo", "medio", "alto"), include.lowest = TRUE)
+    return(fator)
+}
+
+for (var in vars_quantitativas) {
+  dataset_normalizado[[var]] <- discretizar_var(dataset_normalizado[[var]], var)
+}
+
+
+variaveis <- c("explicito", "acusticidade_norm", "dancabilidade_norm", "duracao_ms_norm", "energia_norm", "instrumentalidade", "tonalidade", "vivacidade_norm", "intensidade_sonora_mod", "modo", "discursividade_norm", "compasso", "valencia_norm", "genero", "popularidade_artista_norm", "popularidade_album_norm", "ordem_no_album_norm")
+
+
+
+resultados_anova <- list()  
+
+for (var in variaveis) {
+  formula_anova <- as.formula(paste("nivel_popularidade_norm ~", var))
+  anova_model <- aov(formula_anova, data = dataset_normalizado)
+  resultados_anova[[var]] <- summary(anova_model)
+  
+  print(paste("Resultado da ANOVA para:", var))
+  print(summary(anova_model))
+  
+  p <- ggplot(dataset_normalizado, aes_string(x = var, y = "nivel_popularidade_norm")) +
+    geom_boxplot(fill = "skyblue") +
+    ggtitle(paste("Boxplot de nivel_popularidade_norm por", var)) +
+    theme_minimal() +
+    xlab(var) +
+    ylab("nivel_popularidade_norm") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+  print(p)
+}
+
+
+
+# início do código para testagem das suposições da ANOVA.
+
+leveneTest(nivel_popularidade_norm ~ popularidade_album_norm, dataset_normalizado)
+
+
+listadfs <- list()
+
+listadfs[[variaveis[1]]] <- split(dataset_normalizado, dataset_normalizado$explicito)
+listadfs[[variaveis[2]]] <- split(dataset_normalizado, dataset_normalizado$acusticidade_norm)
+listadfs[[variaveis[3]]] <- split(dataset_normalizado, dataset_normalizado$dancabilidade_norm)
+listadfs[[variaveis[4]]] <- split(dataset_normalizado, dataset_normalizado$duracao_ms_norm)
+listadfs[[variaveis[5]]] <- split(dataset_normalizado, dataset_normalizado$energia_norm)
+listadfs[[variaveis[6]]] <- split(dataset_normalizado, dataset_normalizado$instrumentalidade)
+listadfs[[variaveis[7]]] <- split(dataset_normalizado, dataset_normalizado$tonalidade)
+listadfs[[variaveis[8]]] <- split(dataset_normalizado, dataset_normalizado$vivacidade_norm)
+listadfs[[variaveis[9]]] <- split(dataset_normalizado, dataset_normalizado$intensidade_sonora_mod)
+listadfs[[variaveis[10]]] <- split(dataset_normalizado, dataset_normalizado$modo)
+listadfs[[variaveis[11]]] <- split(dataset_normalizado, dataset_normalizado$discursividade_norm)
+listadfs[[variaveis[12]]] <- split(dataset_normalizado, dataset_normalizado$compasso)
+listadfs[[variaveis[13]]] <- split(dataset_normalizado, dataset_normalizado$valencia_norm)
+listadfs[[variaveis[14]]] <- split(dataset_normalizado, dataset_normalizado$genero)
+listadfs[[variaveis[15]]] <- split(dataset_normalizado, dataset_normalizado$popularidade_artista_norm)
+listadfs[[variaveis[16]]] <- split(dataset_normalizado, dataset_normalizado$popularidade_album_norm)
+
+variavel <- c()
+nome <- c()
+tamanho <- c()
+variancia <- c()
+normalidade <- c()
+
+dfResposta <- data.frame(variavel, nome, tamanho, variancia, normalidade)
+
+for(i in 1:length(listadfs)){
+  
+  variavel <- names(listadfs)[i]
+  nomesInternos <- names(listadfs[[i]])
+  
+  for(j in 1:length(listadfs[[i]])){
+
+    nome <- nomesInternos[j]
+    tamanho <- nrow(listadfs[[i]][[j]])
+    variancia <- var(listadfs[[i]][[j]]$nivel_popularidade_norm)
+    
+    if(!is.na(variancia)){
+      normalidade <- shapiro.test(listadfs[[i]][[j]]$nivel_popularidade_norm)$p.value
+    } else {
+      normalidade <- NA
+    }
+    dfPasso <- data.frame(variavel, nome, tamanho, variancia, normalidade)
+    
+    dfResposta <- rbind(dfResposta, dfPasso)
+  }
+}
+
+dfResposta
+write.csv(dfResposta, "resultados.csv")
