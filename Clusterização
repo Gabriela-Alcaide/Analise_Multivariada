@@ -49,6 +49,8 @@ base_sem_outliers <- base_sem_outliers[-linhas_com_na, ]
 
 # Agora, parto de uma base sem outliers e sem Na, Nan, Inf.
 
+############ K MEANS
+
 # Base para K Means.
 base_clusterizar <- base_sem_outliers[, c("acusticidade_norm", "dancabilidade_norm", "duracao_ms_norm", "energia_norm", "vivacidade_norm", "nivel_popularidade_norm", "intensidade_sonora_mod_norm", "discursividade_norm", "valencia_norm", "popularidade_artista_norm", "popularidade_album_norm", "ordem_no_album_norm", "tonalidade", "modo", "compasso")]
 
@@ -90,7 +92,41 @@ ggplot(base_sem_outliers, aes(x = as.factor(Cluster), y = acusticidade_norm, fil
     geom_boxplot() +
     labs(title = "Comparação da acusticidade entre os Clusters", x = "Cluster", y = "acusticidade")
 
-# Criando um modelo de clusterização hierárquica
+############ CLUSTERIZAÇÃO HIERÁRQUICA
+
+# Transpor a matriz para garantir que as observações sejam as colunas
+dados_cluster_t <- t(as.matrix(base_clusterizar))  # Transpor a matriz
+
+# Calcular a similaridade do cosseno entre LINHAS (observações)
+sim_cos <- cosine(dados_cluster_t)  # Similaridade do cosseno entre observações
+
+# Lista de distâncias a serem testadas (sem a distância de Bray-Curtis)
+metodos_distancia <- list(
+    euclidean = dist(base_clusterizar, method = "euclidean"),
+    manhattan = dist(base_clusterizar, method = "manhattan"),
+    chebyshev = dist(base_clusterizar, method = "maximum"),
+    canberra = dist(base_clusterizar, method = "canberra"),
+    coseno = as.dist(1 - sim_cos)
+)
+
+# Testar diferentes métodos de ligação para cada métrica de distância
+resultados <- lapply(names(metodos_distancia), function(nome_dist) {
+    dist_matriz <- metodos_distancia[[nome_dist]]
+    sapply(c("ward.D", "ward.D2", "complete", "single", "average", "centroid", "median", "mcquitty"), function(metodo) {
+        cluster_hier <- hclust(dist_matriz, method = metodo)
+        cor(dist_matriz, cophenetic(cluster_hier))
+    })
+})
+
+# Organizar resultados em um dataframe
+tabela_resultados <- do.call(rbind, resultados)
+colnames(tabela_resultados) <- c("ward.D", "ward.D2", "complete", "single", "average", "centroid", "median", "mcquitty")
+rownames(tabela_resultados) <- names(metodos_distancia)
+
+# Exibir tabela de resultados
+print(tabela_resultados)
+
+# Criando um modelo de clusterização hierárquica, com base no resultado anterior.
 # Escolhendo os métodos de distância e ligação
 distancias <- dist(base_clusterizar, method = "euclidean")
 cluster_hier <- hclust(distancias, method = "ward.D2")
