@@ -60,3 +60,45 @@ pR2(melhor_modelo)
 
 # printa a matriz de confusao
 matriz_confusao
+
+# Lista dos modelos
+modelos <- list(modelo1, modelo2, modelo3, modelo4, modelo5, modelo6, modelo7, modelo8, modelo9, modelo10, modelo11)
+
+# Nomes dos modelos para facilitar o entendimento
+nomes_modelos <- c("modelo1", "modelo2", "modelo3", "modelo4", "modelo5", "modelo6", "modelo7", "modelo8", "modelo9", "modelo10", "modelo11")
+
+# Definir as variáveis para análise
+variaveis_para_analisar <- c("acusticidade_norm", "dancabilidade_norm", "duracao_ms_norm", "energia_norm", 
+                             "vivacidade_norm", "intensidade_sonora_mod_norm", "discursividade_norm", "valencia_norm", 
+                             "popularidade_artista_norm", "popularidade_album_norm", "ordem_no_album_norm")
+
+# Inicializar um dataframe vazio com as variáveis e modelos
+coef_df <- data.frame(matrix(0, nrow = length(variaveis_para_analisar) + 1, ncol = length(modelos))) # +1 para o Intercept
+colnames(coef_df) <- paste0("modelo", 1:length(modelos))
+rownames(coef_df) <- c("(Intercept)", variaveis_para_analisar)
+
+# Loop para preencher o dataframe com os coeficientes de cada modelo
+for (i in 1:length(modelos)) {
+    coef_model <- coef(modelos[[i]])  # Obter coeficientes do modelo atual
+    
+    # Atualizar o dataframe para cada variável presente no modelo
+    for (var in names(coef_model)) {
+        if (var %in% rownames(coef_df)) {
+            coef_df[var, i] <- coef_model[var]
+        }
+    }
+}
+
+# Criar uma nova paleta de cores com mais sensibilidade para pequenos valores
+nova_paleta <- colorRampPalette(c("steelblue", "white", "pink"))(100)
+
+# Ajustar o limite da escala de cores para realçar os valores menores
+breaks_customizados <- seq(-5, 5, length.out = 100)  # Ajustando para valores entre -5 e 5
+
+# Plotar o heatmap com a nova paleta e limites ajustados
+pheatmap(coef_df, cluster_cols = FALSE, cluster_rows = TRUE, 
+         color = nova_paleta, 
+         breaks = breaks_customizados,  # Usando os limites mais sensíveis
+         display_numbers = TRUE, 
+         main = "Heatmap dos Coeficientes dos Modelos (Mais Sensível)", 
+         fontsize_number = 8)
