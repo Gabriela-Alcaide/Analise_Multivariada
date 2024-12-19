@@ -1,0 +1,133 @@
+# Verificar e eliminar outliers.
+base_real <- Base_de_Dados[, c("ID_musica", "genero", "acusticidade_norm", "dancabilidade_norm", "duracao_ms_norm", "energia_norm", "vivacidade_norm", "nivel_popularidade_norm", "intensidade_sonora_mod_norm", "discursividade_norm", "valencia_norm", "popularidade_artista_norm", "popularidade_album_norm", "ordem_no_album_norm", "tonalidade", "modo", "compasso")]
+
+# Função para remover outliers com base no IQR
+remove_outliers <- function(data) {
+  for (col in colnames(data)) {
+    if (is.numeric(data[[col]])) {
+      Q1 <- quantile(data[[col]], 0.25, na.rm = TRUE)
+      Q3 <- quantile(data[[col]], 0.75, na.rm = TRUE)
+      IQR <- Q3 - Q1
+      limite_inferior <- Q1 - 1.5 * IQR
+      limite_superior <- Q3 + 1.5 * IQR
+      # Filtrar os dados
+      data <- data[data[[col]] >= limite_inferior & data[[col]] <= limite_superior, ]
+    }
+  }
+  return(data)
+}
+
+# Aplicar a função
+base_sem_outliers <- remove_outliers(base_real)
+
+# Padronização das variáveis numéricas (usando Z-score):
+numericas <- base_sem_outliers [, sapply(base_sem_outliers , is.numeric)]
+numericas_padronizado <- scale(numericas)
+base_sem_outliers [, sapply(base_sem_outliers, is.numeric)] <- numericas_padronizado
+
+# Padronizar a categórica Tonalidade: -1 (não identificado) a 11
+base_sem_outliers$tonalidade <- as.numeric(factor(base_sem_outliers$tonalidade, levels = c("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11")))
+base_sem_outliers$tonalidade <- scale(base_sem_outliers$tonalidade)
+
+# Padronizar a categórica Modo:0 ou 1
+base_sem_outliers$modo <- as.numeric(factor(base_sem_outliers$modo, levels = c("0", "1")))
+base_sem_outliers$modo <- scale(base_sem_outliers$modo)
+
+# Padronizar a categórica compasso: 3 a 7
+base_sem_outliers$compasso <- as.numeric(factor(base_sem_outliers$compasso, levels = c("3", "4", "5", "6", "7")))
+base_sem_outliers$compasso <- scale(base_sem_outliers$compasso)
+
+# Verificar se há NAs, NaNs e Infs.
+any(is.na(base_sem_outliers))         # Verifica NA
+any(is.nan(as.matrix(base_sem_outliers)))   # Verifica NaN
+any(is.infinite(as.matrix(base_sem_outliers))) # Verifica Inf
+
+# Há Na.
+
+linhas_com_na <- which(rowSums(is.na(base_sem_outliers)) > 0)
+base_sem_outliers <- base_sem_outliers[-linhas_com_na, ]
+
+# Agora, parto de uma base sem outliers e sem Na, Nan, Inf.
+
+# Base para K Means.
+base_clusterizar <- base_sem_outliers[, c("acusticidade_norm", "dancabilidade_norm", "duracao_ms_norm", "energia_norm", "vivacidade_norm", "nivel_popularidade_norm", "intensidade_sonora_mod_norm", "discursividade_norm", "valencia_norm", "popularidade_artista_norm", "popularidade_album_norm", "ordem_no_album_norm", "tonalidade", "modo", "compasso")]
+
+# Método do cotovelo (determinar K).
+# Calcular a soma das distâncias quadradas dentro de cada cluster para diferentes valores de k
+set.seed(123)  # Defina uma semente para reprodutibilidade
+wss <- numeric(15)  # Vetor para armazenar a soma dos quadrados dentro do cluster (WSS)
+for (k in 1:15) {
+kmeans_model <- kmeans(base_clusterizar, centers = k)
+wss[k] <- kmeans_model$tot.withinss
+}
+
+# Plot do gráfico do cotovelo
+plot(1:15, wss, type = "b", main = "Método do Cotovelo", xlab = "Número de Clusters (k)", ylab = "Soma dos Quadrados Dentro do Cluster (WSS)")
+# Melhor cenário: 11 clusters.
+
+set.seed(123)  # Defina uma semente para reprodutibilidade
+kmeans_result <- kmeans(base_clusterizar, centers = 11, nstart = 25)
+
+# Visualizar os resultados
+print(kmeans_result)
+
+# Ver os centroides dos clusters print
+(kmeans_result$centers)
+
+# Ver a distribuição dos dados em clusters
+table(kmeans_result$cluster)
+
+# Ver a soma das distâncias dentro de cada cluster
+print(kmeans_result$tot.withinss)
+
+# Adicionar os clusters à base original
+base_sem_outliers$Cluster <- factor(kmeans_result$cluster)
+
+# Comparando variáveis entre os clusters
+
+# Boxplot comparando var1 entre todos os clusters
+ggplot(base_sem_outliers, aes(x = as.factor(Cluster), y = acusticidade_norm, fill = as.factor(Cluster))) +
+    geom_boxplot() +
+    labs(title = "Comparação da acusticidade entre os Clusters", x = "Cluster", y = "acusticidade")
+
+# Criando um modelo de clusterização hierárquica
+# Escolhendo os métodos de distância e ligação
+distancias <- dist(base_clusterizar, method = "euclidean")
+cluster_hier <- hclust(distancias, method = "ward.D2")
+
+# Plotar o dendrograma para escolher o número de clusters
+plot(cluster_hier, main = "Dendrograma com Clusters Destacados")
+
+# Cortar o dendrograma em 7 clusters
+rect.hclust(cluster_hier, k = 7, border = "red")
+clusters <- cutree(cluster_hier, k = 7)
+
+# Contar o número de observações em cada cluster
+table(clusters)
+
+# Plotar o gráfico de clusters
+library(factoextra)
+# Plote o gráfico de clusters sem os números
+fviz_cluster(list(data = base_clusterizar, cluster = clusters), geom = "point", label = "none")
+
+# agregando a clusterização na base de dados sem outliers
+base_sem_outliers$Cluster <- factor(clusters)
+
+# extraindo os boxplots de todas as variaveis
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+
+# Transformar os dados para o formato longo
+base_long <- base_sem_outliers %>%
+    pivot_longer(cols = where(is.numeric), names_to = "Variavel", values_to = "Valor")
+
+# Criar boxplots para todas as variáveis numéricas
+ggplot(base_long, aes(x = as.factor(Cluster), y = Valor, fill = as.factor(Cluster))) +
+    geom_boxplot() +
+    facet_wrap(~Variavel, scales = "free") +
+    labs(title = "Comparação de Variáveis Numéricas entre os Clusters",
+         x = "Cluster",
+         y = "Valor") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
