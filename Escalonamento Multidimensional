@@ -1,0 +1,111 @@
+# Seleção das variáveis
+variaveis_norm <- names(dados)[grepl("_norm$", names(dados))]
+dados_norm <- dados[, variaveis_norm]
+
+# Verificação das classes e remoção das não numéricas
+dados_norm <- dados_norm[sapply(dados_norm, is.numeric)]
+
+# Verificação de valores ausentes/nulos
+print("Valores ausentes por variável:")
+print(colSums(is.na(dados_norm)))
+
+dados_sem_na <- na.omit(dados_norm) 
+print(paste("Linhas após remoção de valores ausentes:", nrow(dados_sem_na)))
+
+# Detecção de outliers
+detectar_outliers <- function(x) {
+  Q1 <- quantile(x, 0.25, na.rm = TRUE)
+  Q3 <- quantile(x, 0.75, na.rm = TRUE)
+  IQR <- Q3 - Q1
+  limites <- c(Q1 - 1.5 * IQR, Q3 + 1.5 * IQR)
+  return(x < limites[1] | x > limites[2])
+}
+
+outliers <- data.frame(sapply(dados_sem_na, detectar_outliers))
+colnames(outliers) <- colnames(dados_sem_na)
+
+outliers_por_variavel <- colSums(outliers)
+print("Quantidade de outliers por variável:")
+print(outliers_por_variavel)
+
+linhas_sem_outliers <- !apply(outliers, 1, any)
+dados_limpos <- dados_sem_na[linhas_sem_outliers, ]
+print(paste("Linhas após remoção de outliers:", nrow(dados_limpos)))
+
+variaveis_D1 <- dados_limpos[, c("popularidade_artista_norm","dancabilidade_norm", "intensidade_sonora_mod_norm", "energia_norm", "vivacidade_norm")]
+
+variaveis_D2 <- dados_limpos[, c("popularidade_album_norm","ordem_no_album_norm","discursividade_norm", "valencia_norm", "acusticidade_norm", "duracao_ms_norm")]
+
+variaveis_combinadas <- cbind(variaveis_D1, variaveis_D2)
+
+matriz_dist_ajustada <- dist(variaveis_combinadas, method = "euclidean")
+
+mds_result_ajustado <- cmdscale(matriz_dist_ajustada, k = 2, eig = TRUE)
+
+resultados_mds_ajustados <- data.frame(
+  Dim1 = mds_result_ajustado$points[, 1],
+  Dim2 = mds_result_ajustado$points[, 2],
+  Popularidade = dados_limpos$nivel_popularidade_norm
+)
+
+# Gráfico
+library(ggplot2)
+ggplot(resultados_mds_ajustados, aes(x = Dim1, y = Dim2, color = Popularidade)) +
+  geom_point(size = 3) +
+  scale_color_gradient(low = "blue", high = "red") +
+  labs(
+    title = "MDS Ajustado com Variáveis Selecionadas",
+    x = "(Dim1)", 
+    y = "(Dim2)", 
+    color = "Popularidade"
+  ) +
+  theme_minimal()
+
+
+# Calcular a variância explicada pelas dimensões
+autovalores <- mds_result_ajustado$eig
+variancia_explicada <- cumsum(abs(autovalores)) / sum(abs(autovalores))
+
+print("Variância explicada acumulada:")
+print(variancia_explicada[1:2])  
+
+# Função para calcular o estresse
+calcular_estresse <- function(dist_original, dist_ajustada) {
+  stress <- sqrt(sum((dist_original - dist_ajustada)^2) / sum(dist_original^2))
+  return(stress)
+}
+estresse <- calcular_estresse(
+  dist_original = as.vector(matriz_dist_ajustada),
+  dist_ajustada = as.vector(distancias_ajustadas)
+)
+print(paste("Função de estresse:", estresse))
+
+library(ggplot2)
+library(ggrepel)
+
+# Gráfico com projeção das variáveis
+ggplot(resultados_mds_ajustados, aes(x = Dim1, y = Dim2, color = Popularidade)) +
+  geom_point(size = 3) +   geom_segment(
+    data = vetores, 
+    aes(x = 0, y = 0, xend = PC1, yend = PC2),
+    arrow = arrow(length = unit(0.3, "cm")), size = 1.2,
+    color = "black"
+  ) +
+  geom_text_repel(
+    data = vetores, 
+    aes(x = PC1, y = PC2, label = variavel),
+    size = 5,     
+    color = "darkred", 
+    box.padding = 0.5 ) +
+  scale_color_gradient(low = "blue", high = "red") +
+  labs(
+    title = "MDS com Projeção das Variáveis",
+    x = "(Dim1)", 
+    y = "(Dim2)", 
+    color = "Popularidade"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),  
+    axis.title = element_text(size = 14) 
+  )
