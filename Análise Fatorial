@@ -1,0 +1,99 @@
+############ Teste com todas as variáveis.
+# KMO.
+KMO(dados[,1:11])
+
+# Bartlett.
+cortest.bartlett(dados[,1:11])
+
+# Aplicação Análise Fatorial.
+fapot <- factanal(dados[,1:11], factors=4, rotation="varimax")
+print(fapot)
+
+############ Hipótese a partir da Matriz de Correlação.
+matriz_correlacao <- cor(dados, use = "complete.obs", method = "pearson")
+print(matriz_correlacao)
+
+# Hipótese: 03 fatores latentes:
+# 1) Popularidade Artista e Popularidade Álbum.
+# 2) Acusticidade, Intensidade e Energia.
+# 3) Vivacidade e Dançabilidade.
+
+# KMO.
+KMO(dados[,1:7])
+# Bartlett.
+cortest.bartlett(dados[,1:7])
+
+# Aplicação Análise Fatorial.
+fapot <- factanal(dados[,1:7], factors=3, rotation="varimax")
+print(fapot)
+
+# Cargas.
+cargas <- fapot$loadings
+comunalidades <- rowSums(cargas^2)
+print(comunalidades)
+
+# Regressão Linear com os Fatores.
+variaveis_extras <- c("discursividade_norm", "duracao_ms_norm", "valencia_norm", "ordem_no_album_norm")
+
+fapot<-factanal(dados_an_fat[,1:7], factors = 3, rotation = "varimax", scores = "regression")
+
+pontos_fatoriais <- as.data.frame(fapot$scores)
+
+dados_modelo <- cbind(as.data.frame(pontos_fatoriais), Base_de_Dados[, variaveis_extras])
+
+modelo <- lm(Base_de_Dados$nivel_popularidade_norm ~ ., data = dados_modelo)
+
+summary(modelo)
+
+# Regressão Logística com os Fatores.
+modelo_logistico <- glm(Base_de_Dados$e_popular_norm ~ ., data = dados_modelo, family = binomial)
+
+summary(modelo_logistico)
+
+probabilidades <- predict(modelo_logistico, type = "response")
+
+previsoes <- ifelse(probabilidades > 0.5, 1, 0)
+
+acuracia <- mean(previsoes == Base_de_Dados$e_popular_norm)
+
+############ Outras possibilidades.
+# Definir as variáveis disponíveis
+variaveis <- c("acusticidade_norm", "dancabilidade_norm", "duracao_ms_norm", "energia_norm", "vivacidade_norm", "intensidade_sonora_mod_norm", "discursividade_norm", "valencia_norm", "popularidade_artista_norm", "popularidade_album_norm", "ordem_no_album_norm")
+
+# Definir os possíveis números de fatores a serem testados
+fatores <- c(2,3,4,5)
+
+melhor_combinacao_x <- list()
+
+comb_var <- combn(variaveis, x, simplify = FALSE)
+
+for (variaveis_selecionadas in comb_var) {
+    for (fac in fatores){
+        kmo = KMO(Base_de_Dados[,variaveis_selecionadas]) # teste KMO
+        kmo_val = kmo$MSA
+        bartlett = cortest.bartlett(dados_an_fat)
+        p_bartlett = bartlett$p.value
+        
+        # Tentar executar a análise fatorial e capturar erros
+        resultado <- tryCatch({
+            # Executar a análise fatorial
+            fat = factanal(Base_de_Dados[, unlist(variaveis_selecionadas)], factors = fac, rotation = "varimax")
+            p_fat <- fat$PVAL
+            uniquenesses = fat$uniquenesses
+            variaveis_baixa_unicidade <- names(uniquenesses[uniquenesses < 0.5]) 
+            num_variaveis_baixa_unicidade <- length(variaveis_baixa_unicidade)
+            
+            if (kmo_val >= 0.6 & p_bartlett <= 0.05 & p_fat >= 0.05 & num_variaveis_baixa_unicidade >= 8/2) {
+                melhor_combinacao_x = append(melhor_combinacao_x, list(list(variaveis = variaveis_selecionadas, fatores = fac)))
+            }
+       
+        }, error = function(e) {
+            # Em caso de erro, exibe uma mensagem e retorna NULL
+            message("Erro na combinação: ", toString(variaveis_selecionadas), 
+                    " com ", fac, " fatores. Erro: ", e$message)
+            return(NULL)
+        })
+    }
+}
+lista_combinada <- c(melhor_combinacao_11, melhor_combinacao_10, melhor_combinacao_9, melhor_combinacao_8, melhor_combinacao_7, melhor_combinacao_6, melhor_combinacao_5, melhor_combinacao_4)
+
