@@ -11,7 +11,6 @@ variaveis <- c("acusticidade_norm", "dancabilidade_norm", "duracao_ms_norm", "en
 melhor_acuracia <- -Inf
 melhor_combinacao <- c()
 
-# Mesmo código foi rodado várias vezes, para quantidades diferentes de variáveis.
 # Gerar todas as combinações possíveis de N variáveis
 comb_var <- combn(variaveis, 7, simplify = FALSE)
 
