@@ -1,0 +1,63 @@
+#pacotes necessarios para executar o codigo
+library(ggplot2)
+library(dplyr)
+library(pscl)
+
+# Definir as variáveis disponíveis
+variaveis <- c("acusticidade_norm", "dancabilidade_norm", "duracao_ms_norm", "energia_norm", 
+               "vivacidade_norm", "intensidade_sonora_mod_norm", "discursividade_norm", "valencia_norm", 
+               "popularidade_artista_norm", "popularidade_album_norm", "ordem_no_album_norm")
+
+melhor_acuracia <- -Inf
+melhor_combinacao <- c()
+
+# Mesmo código foi rodado várias vezes, para quantidades diferentes de variáveis.
+# Gerar todas as combinações possíveis de N variáveis
+comb_var <- combn(variaveis, 7, simplify = FALSE)
+
+# Loop sobre todas as combinações
+for (variaveis_selecionadas in comb_var) {
+    
+    # Ajustar o modelo de regressão logística com a combinação de variáveis
+    modelo <- glm(e_popular_norm ~ ., data = Base_de_Dados[, c("e_popular_norm", variaveis_selecionadas)], family = binomial)
+    
+    # Calcular o valor da acurácia
+    matconf <- table(Base_de_Dados$e_popular_norm, round(predict(modelo, Base_de_Dados, type="response")))
+    acuracia <- sum(diag(matconf)) / sum(matconf)
+    
+    # Verificar se essa é a melhor acurácia
+    if (acuracia > melhor_acuracia) {
+        melhor_acuracia <- acuracia
+        melhor_combinacao <- variaveis_selecionadas
+        melhor_modelo <- modelo
+        matriz_confusao <- matconf
+    }
+}
+
+# Exibir o resultado
+cat("Melhor combinação de variáveis:", melhor_combinacao, "\n")
+cat("Melhor acurácia:", melhor_acuracia, "\n")
+
+# A partir daqui o codigo realiza a criação dos gráficos e a análise dos resultados
+
+# criar uma variável para armazenar as previsões
+prev.Base_de_Dados <- predict(melhor_modelo, Base_de_Dados, type="response")
+
+# criar um gráfico onde é possivel comparar as previsoes com a variável dependente
+plot(Base_de_Dados$e_popular_norm,prev.Base_de_Dados, col="steelblue")
+
+# Adicionar uma linha vermelha no valor Y = 0.5
+abline(h = 0.5, col = "red", lwd = 2)  # 'h' indica uma linha horizontal
+
+# criar um gráfico de dispersão da variavel e_popular_norm com a linha de regressão logística
+ggplot(Base_de_Dados, aes_string(x = paste(melhor_combinacao, collapse = " + "), y = "e_popular_norm")) +
+  geom_point(alpha = 0.5) +
+  stat_smooth(method = "glm", se = FALSE, method.args = list(family = binomial)) +
+  labs(title = "Regressão Logística com as Variáveis Selecionadas") +
+  theme_minimal()
+
+# pegar as estatísticas
+pR2(melhor_modelo)
+
+# printa a matriz de confusao
+matriz_confusao
