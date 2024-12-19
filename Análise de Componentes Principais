@@ -1,0 +1,37 @@
+variaveis_norm <- dataset[, grep("_norm$", colnames(dataset))]
+pca_result <- prcomp(variaveis_norm, scale = TRUE)
+print(pca_result)
+
+variancia_explicada <- pca_result$sdev^2 / sum(pca_result$sdev^2) variancia_explicada
+print(variancia_explicada)
+
+# Scree Plot.
+library(ggplot2) 
+qplot(c(1:length(variancia_explicada)), variancia_explicada) + geom_line() + xlab("Componente Principal") + ylab("Proporção de Variância Explicada") + ggtitle("Scree Plot") + ylim(0, 1)
+
+# Autovalores e Autovetores.
+autovalores <- pca_result$sdev^2 
+autovetores <- pca_result$rotation
+
+# Biplot simples.
+biplot(pca_result, scale = 0)
+
+# Biplot visualmente mais detalhado.
+library(ggplot2)
+library(ggrepel)
+scores <- as.data.frame(pca_result$x)  # Pontuações das observações
+loadings <- as.data.frame(pca_result$rotation)  # Carregamentos das variáveis
+ loadings$PC1 <- loadings$PC1 * max(abs(scores$PC1))
+ loadings$PC2 <- loadings$PC2 * max(abs(scores$PC2))
+
+ggplot() +
+geom_point(data = scores, aes(x = PC1, y = PC2), color = "blue", alpha = 0.5, size = 2) +
+geom_segment(data = loadings, aes(x = 0, y = 0, xend = PC1, yend = PC2),
+ arrow = arrow(length = unit(0.3, "cm")), color = "black", size = 1) + geom_text_repel(data = loadings, aes(x = PC1, y = PC2, label = rownames(loadings)),
+ color = "black", size = 5, fontface = "bold") +
+labs(title = "PCA Biplot com Ajustes de Visualização",
+x = paste("PC1 -", round(summary(pca_result)$importance[2, 1] * 100, 1), "% Variância Explicada"),
+y = paste("PC2 -", round(summary(pca_result)$importance[2, 2] * 100, 1), "% Variância Explicada")) +
+theme_minimal() +
+ theme(axis.title = element_text(size = 14),
+plot.title = element_text(size = 16, hjust = 0.5))
