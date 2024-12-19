@@ -5,6 +5,10 @@ KMO(dados[,1:11])
 # Bartlett.
 cortest.bartlett(dados[,1:11])
 
+# Scree Plot.
+fa.parallel(dados, fa = "fa")
+# 04 fatores.
+
 # Aplicação Análise Fatorial.
 fapot <- factanal(dados[,1:11], factors=4, rotation="varimax")
 print(fapot)
@@ -22,6 +26,10 @@ print(matriz_correlacao)
 KMO(dados[,1:7])
 # Bartlett.
 cortest.bartlett(dados[,1:7])
+
+# Scree Plot.
+fa.parallel(dados, fa = "fa")
+# 03 fatores.
 
 # Aplicação Análise Fatorial.
 fapot <- factanal(dados[,1:7], factors=3, rotation="varimax")
