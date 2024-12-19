@@ -1,3 +1,6 @@
+library(psych)
+library(stats)
+
 ############ Teste com todas as variáveis.
 # KMO.
 KMO(dados[,1:11])
