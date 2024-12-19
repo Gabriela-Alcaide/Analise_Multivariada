@@ -1,0 +1,26 @@
+#criar modelo de regressão linear multipla
+pop_dur_viva_dis_dan_val = lm(Base_de_Dados$nivel_popularidade_norm ~ Base_de_Dados$duracao_ms_norm+Base_de_Dados$vivacidade_norm+Base_de_Dados$discursividade_norm+Base_de_Dados$dancabilidade_norm+Base_de_Dados$valencia_norm)
+
+#código para criar histograma
+#mudar em 2 lugares
+hist(pop_dur_viva_dis_dan_val$residuals, probability = TRUE, col = "lightblue", border = "black", main = "Histograma dos resíduos com 5 variaveis", xlab = "Valores", ylab = "Densidade")
+
+# Sobrepor a curva da distribuição normal
+#Mudar em 4 lugares
+x <- seq(min(pop_dur_viva_dis_dan_val$residuals), max(pop_dur_viva_dis_dan_val$residuals), length = 100)
+curve(dnorm(x, mean = mean(pop_dur_viva_dis_dan_val$residuals), sd = sd(pop_dur_viva_dis_dan_val$residuals)), col = "red", lwd = 2, add = TRUE)
+
+#grafico para ver dispersao dos resíduos x valores ajustados
+plot(rstudent(pop_dur_viva_dis_dan_val) ~ fitted(pop_dur_viva_dis_dan_val))
+
+#grafico valores reais x valores ajustados
+#Grafico que mostra os valores reais e os valores estimados
+plot(Base_de_Dados$nivel_popularidade_norm, fitted.values(pop_dur_viva_dis_dan_val), 
+     main = "Valores Reais vs. Estimados", 
+     xlab = "Valores Reais", 
+     ylab = "Valores Estimados", 
+     pch = 20, col = "blue")
+
+# Adicionar linha 1:1 para referência
+abline(0, 1, col = "red")
+
